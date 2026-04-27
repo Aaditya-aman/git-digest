@@ -15,13 +15,14 @@ export default function DashboardPage() {
     const storedData = sessionStorage.getItem('analysisData');
     if (storedData) {
       try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setData(JSON.parse(storedData));
       } catch (err) {
         console.error("Failed to parse analysis data", err);
       }
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {

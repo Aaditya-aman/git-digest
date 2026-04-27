@@ -10,12 +10,13 @@ import ReactMarkdown from 'react-markdown';
 
 interface AnalysisData {
   project: string | string[];
-  structure: string | string[];
+  structure?: string | string[];
+  directoryStructure?: string | string[];
   features: string | string[];
   keyFiles: string | string[];
   dataFlow: string | string[];
   summary: string | string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export default function AnalysisDashboard({ data }: { data: AnalysisData }) {
@@ -27,9 +28,9 @@ export default function AnalysisDashboard({ data }: { data: AnalysisData }) {
       delay: 0.1
     },
     {
-      title: "2. Structure",
+      title: "2. Directory Structure",
       icon: <FolderTree className="w-5 h-5 text-emerald-400" />,
-      content: data.structure,
+      content: data.directoryStructure || data.structure,
       delay: 0.15
     },
     {
