@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     try {
       console.log(`Running official Gitingest on ${url}...`);
-      await execAsync(`gitingest "${url}" -o "${tempFilePath}"`);
+      await execAsync(`python -m gitingest "${url}" -o "${tempFilePath}"`);
     } catch (e: unknown) {
       throw new Error("GitIngest official tool failed to run: " + String(e));
     }
