@@ -1,12 +1,53 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
 
-const execAsync = promisify(exec);
+
+async function fetchRepoContents(owner: string, repo: string, currentPath: string = ''): Promise<string> {
+  let digest = '';
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}`;
+  
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'GitDigest-App'
+  };
+  
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  const res = await fetch(url, { headers });
+  
+  if (!res.ok) {
+     if (res.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access denied.');
+     }
+     throw new Error(`Failed to fetch ${url}: ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : [data];
+
+  for (const item of items) {
+    // Basic filtering to avoid large/binary files or node_modules
+    if (item.path.includes('node_modules') || item.path.includes('.git')) continue;
+
+    if (item.type === 'file') {
+      if (item.size > 100000) continue; // Skip files > 100KB
+      
+      if (item.download_url) {
+        const fileRes = await fetch(item.download_url);
+        if (fileRes.ok) {
+          const content = await fileRes.text();
+          digest += `\n--- ${item.path} ---\n${content}\n`;
+        }
+      }
+    } else if (item.type === 'dir') {
+      digest += await fetchRepoContents(owner, repo, item.path);
+    }
+  }
+
+  return digest;
+}
 
 export async function POST(req: Request) {
   try {
@@ -16,17 +57,20 @@ export async function POST(req: Request) {
     const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
     if (!match) return NextResponse.json({ error: 'Invalid GitHub URL. Must be like https://github.com/owner/repo' }, { status: 400 });
 
-    const tempFilePath = path.join(os.tmpdir(), `digest-${Date.now()}.txt`);
-
-    try {
-      console.log(`Running official Gitingest on ${url}...`);
-      await execAsync(`python -m gitingest "${url}" -o "${tempFilePath}"`);
-    } catch (e: unknown) {
-      throw new Error("GitIngest official tool failed to run: " + String(e));
+    const owner = match[1];
+    let repo = match[2];
+    // Remove .git if present at the end
+    if (repo.endsWith('.git')) {
+      repo = repo.slice(0, -4);
     }
 
-    const digest = await fs.readFile(tempFilePath, 'utf8');
-    await fs.unlink(tempFilePath).catch(() => null);
+    let digest = '';
+    try {
+      console.log(`Fetching repository contents for ${owner}/${repo}...`);
+      digest = await fetchRepoContents(owner, repo);
+    } catch (e: unknown) {
+      throw new Error("Failed to fetch repository contents: " + (e instanceof Error ? e.message : String(e)));
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
