@@ -71,7 +71,7 @@ ${digest.substring(0, 500000)}
     while (retries > 0) {
       try {
         response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3-flash-preview",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
